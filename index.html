@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HR座席表メーカー (6x8)</title>
+    <title>座席メーカー</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
         
         body {
             font-family: 'Noto Sans JP', sans-serif;
-            background-color: #f3f4f6;
+            background-color: #f1f5f9; /* Slate-100 */
         }
 
         /* 印刷設定 */
@@ -24,76 +24,83 @@
             .seat-container { 
                 border: 2px solid #000;
                 box-shadow: none;
-                transform: scale(0.9); /* A4に収まるように少し縮小 */
+                transform: scale(0.9);
                 margin: 0 auto;
+                background: white !important;
             }
             .seat {
                 border: 1px solid #000 !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            /* 印刷時は色を薄くするか、そのままにするか。今回は視認性重視でそのまま */
             .main-layout { display: block; }
             .control-panel { display: none; }
-            .grid-area { width: 100%; justify-content: center; }
+            .grid-area { width: 100%; justify-content: center; background: white; }
+            /* 印刷時はヘッダー非表示 */
+            header { display: none; }
         }
 
         /* 座席の個別スタイル */
         .seat {
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             user-select: none;
         }
         .seat:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
             z-index: 10;
         }
         .seat.dragging {
-            opacity: 0.5;
+            opacity: 0.6;
             transform: scale(0.95);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
         .seat.drag-over {
-            border: 2px dashed #4B5563;
-            transform: scale(1.05);
+            border: 2px dashed #64748b; /* Slate-500 */
+            transform: scale(1.02);
         }
 
         /* 視点回転アニメーション */
         .rotate-180-centered {
             transform: rotate(180deg);
         }
-        /* 回転時、文字は逆さまにならないように座席自体をもう一度回す */
         .rotate-180-centered .seat-content {
             transform: rotate(180deg);
         }
 
         /* カスタムスクロールバー */
         textarea::-webkit-scrollbar {
-            width: 8px;
+            width: 6px;
         }
         textarea::-webkit-scrollbar-track {
-            background: #f1f1f1; 
+            background: #f8fafc; 
         }
         textarea::-webkit-scrollbar-thumb {
             background: #cbd5e1; 
-            border-radius: 4px;
+            border-radius: 3px;
         }
         textarea::-webkit-scrollbar-thumb:hover {
             background: #94a3b8; 
         }
     </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden">
+<body class="h-screen flex flex-col overflow-hidden text-slate-800">
 
     <!-- ヘッダー -->
-    <header class="bg-white shadow-sm z-10 no-print">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center gap-2">
-                <i class="fas fa-school text-indigo-600 text-xl"></i>
-                <h1 class="text-xl font-bold text-gray-800">HR 座席表メーカー <span class="text-sm font-normal text-gray-500 ml-2">6列 × 8段</span></h1>
+    <header class="bg-slate-800 shadow-md z-10 no-print">
+        <div class="max-w-full mx-auto px-6 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-500 text-white p-2 rounded-lg">
+                    <i class="fas fa-layer-group"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white tracking-wide">座席メーカー</h1>
+                    <span class="text-xs text-slate-400 font-medium tracking-wider">CLASSROOM SEATING CHART 6x8</span>
+                </div>
             </div>
-            <div class="flex gap-2">
-                <button onclick="window.print()" class="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md text-sm font-medium transition flex items-center gap-2">
-                    <i class="fas fa-print"></i> 印刷する
+            <div class="flex gap-3">
+                <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-slate-600">
+                    <i class="fas fa-print"></i> <span class="hidden sm:inline">印刷</span>
                 </button>
             </div>
         </div>
@@ -103,47 +110,51 @@
     <main class="flex-1 flex overflow-hidden main-layout">
         
         <!-- 左サイドバー（設定・入力） -->
-        <aside class="w-80 bg-white border-r border-gray-200 flex flex-col overflow-y-auto no-print control-panel z-20 shadow-lg">
-            <div class="p-4 space-y-6">
+        <aside class="w-80 bg-white border-r border-slate-200 flex flex-col overflow-y-auto no-print control-panel z-20 shadow-lg">
+            <div class="p-5 space-y-6">
                 
                 <!-- 名簿入力エリア -->
                 <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-bold text-blue-600 mb-1"><i class="fas fa-mars"></i> 男子名簿 (改行区切り)</label>
-                        <textarea id="boyNames" class="w-full h-32 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none" placeholder="相川&#13;井上&#13;上野..."></textarea>
-                        <div class="text-xs text-gray-500 text-right mt-1">人数: <span id="boyCount">0</span>人</div>
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-xs font-bold text-blue-600 uppercase tracking-wider"><i class="fas fa-mars mr-1"></i> 男子名簿</label>
+                            <span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold"><span id="boyCount">0</span>名</span>
+                        </div>
+                        <textarea id="boyNames" class="w-full h-24 p-2 bg-white border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none transition" placeholder="リストを貼り付け..."></textarea>
                     </div>
-                    <div>
-                        <label class="block text-sm font-bold text-pink-600 mb-1"><i class="fas fa-venus"></i> 女子名簿 (改行区切り)</label>
-                        <textarea id="girlNames" class="w-full h-32 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm resize-none" placeholder="安藤&#13;伊藤&#13;宇野..."></textarea>
-                        <div class="text-xs text-gray-500 text-right mt-1">人数: <span id="girlCount">0</span>人</div>
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-xs font-bold text-pink-600 uppercase tracking-wider"><i class="fas fa-venus mr-1"></i> 女子名簿</label>
+                            <span class="bg-pink-100 text-pink-800 text-xs px-2 py-0.5 rounded-full font-bold"><span id="girlCount">0</span>名</span>
+                        </div>
+                        <textarea id="girlNames" class="w-full h-24 p-2 bg-white border border-slate-300 rounded focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm resize-none transition" placeholder="リストを貼り付け..."></textarea>
                     </div>
                 </div>
 
-                <div class="border-t border-gray-200 pt-4">
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">座席パターン設定</label>
+                <div class="border-t border-slate-100 pt-4">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">レイアウト・プリセット</label>
                     <div class="grid grid-cols-2 gap-2 mb-2">
-                        <button onclick="applyPreset('checker')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium text-gray-700 transition">
-                            <i class="fas fa-chess-board mr-1"></i> 市松模様
+                        <button onclick="applyPreset('checker')" class="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 rounded text-xs font-medium text-slate-600 transition shadow-sm text-left">
+                            <i class="fas fa-chess-board mr-2 text-slate-400"></i>市松模様
                         </button>
-                        <button onclick="applyPreset('rows')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium text-gray-700 transition">
-                            <i class="fas fa-grip-lines-vertical mr-1"></i> 男女列別
+                        <button onclick="applyPreset('rows')" class="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 rounded text-xs font-medium text-slate-600 transition shadow-sm text-left">
+                            <i class="fas fa-grip-lines-vertical mr-2 text-slate-400"></i>男女列別
                         </button>
-                        <button onclick="applyPreset('boys-front')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium text-gray-700 transition">
-                            <i class="fas fa-arrow-up mr-1"></i> 男子前
+                        <button onclick="applyPreset('boys-front')" class="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 rounded text-xs font-medium text-slate-600 transition shadow-sm text-left">
+                            <i class="fas fa-arrow-up mr-2 text-slate-400"></i>男子前方
                         </button>
-                        <button onclick="applyPreset('reset')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium text-red-600 transition">
-                            <i class="fas fa-eraser mr-1"></i> 全クリア
+                        <button onclick="applyPreset('reset')" class="px-3 py-2 bg-white border border-red-100 hover:bg-red-50 hover:border-red-200 rounded text-xs font-medium text-red-600 transition shadow-sm text-left">
+                            <i class="fas fa-eraser mr-2 text-red-300"></i>全クリア
                         </button>
                     </div>
-                    <p class="text-xs text-gray-400">※座席クリックで属性変更（フリー→男→女→不可）</p>
+                    <p class="text-[10px] text-slate-400 mt-2 text-center">※ 座席クリックで属性切替 (フリー/男/女/不可)</p>
                 </div>
 
-                <div class="border-t border-gray-200 pt-4 space-y-3">
-                    <button onclick="shuffleSeats()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition transform hover:scale-[1.02] active:scale-95 flex justify-center items-center gap-2">
-                        <i class="fas fa-random"></i> 席決めスタート
+                <div class="border-t border-slate-100 pt-4 space-y-3">
+                    <button onclick="shuffleSeats()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-slate-300/50 transition transform hover:-translate-y-0.5 flex justify-center items-center gap-2">
+                        <i class="fas fa-bolt text-yellow-400"></i> 席決めスタート
                     </button>
-                    <button onclick="clearNamesOnly()" class="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-md transition text-sm">
+                    <button onclick="clearNamesOnly()" class="w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 font-medium py-2 px-4 rounded-lg transition text-sm">
                         名前のみクリア
                     </button>
                 </div>
@@ -151,35 +162,36 @@
         </aside>
 
         <!-- 右エリア（座席グリッド） -->
-        <div class="flex-1 bg-gray-100 overflow-auto p-4 md:p-8 flex flex-col items-center grid-area relative">
+        <div class="flex-1 bg-slate-100 overflow-auto p-4 md:p-8 flex flex-col items-center grid-area relative">
             
             <!-- ビュー切り替えコントロール -->
-            <div class="mb-6 flex items-center gap-4 bg-white p-2 rounded-full shadow-sm border border-gray-200 no-print z-10">
-                <span id="viewLabel" class="text-sm font-bold px-3 py-1 bg-gray-100 rounded-full text-gray-600">
-                    <i class="fas fa-users mr-1"></i> 生徒側から（掲示用）
+            <div class="mb-8 flex items-center gap-4 bg-white p-1.5 rounded-full shadow-sm border border-slate-200 no-print z-10">
+                <span id="viewLabel" class="text-xs font-bold px-4 py-1.5 bg-slate-100 rounded-full text-slate-600 uppercase tracking-wide">
+                    <i class="fas fa-users mr-1"></i> 生徒視点
                 </span>
-                <button onclick="toggleView()" class="text-indigo-600 hover:text-indigo-800 transition p-2 rounded-full hover:bg-indigo-50" title="視点を180度回転">
-                    <i class="fas fa-sync-alt fa-lg"></i>
+                <button onclick="toggleView()" class="text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition w-8 h-8 rounded-full flex items-center justify-center" title="視点を180度回転">
+                    <i class="fas fa-sync-alt"></i>
                 </button>
             </div>
 
             <!-- 黒板エリア -->
-            <div id="blackboard" class="w-3/4 max-w-3xl h-12 bg-green-800 rounded-lg shadow-md flex items-center justify-center mb-8 text-white font-bold tracking-[1em] border-4 border-yellow-700/50">
-                黒板
+            <div id="blackboard" class="w-3/4 max-w-3xl h-10 bg-[#2d4035] rounded shadow-md flex items-center justify-center mb-8 text-white/80 text-sm font-bold tracking-[1em] border-b-4 border-[#3e2723]/60 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none"></div>
+                黒　板
             </div>
 
             <!-- 座席コンテナ -->
-            <div id="seatContainer" class="seat-container bg-white p-6 rounded-xl shadow-xl transition-transform duration-500 ease-in-out">
+            <div id="seatContainer" class="seat-container bg-white p-8 rounded-2xl shadow-xl shadow-slate-200/50 transition-transform duration-500 ease-in-out border border-slate-100">
                 <div class="grid grid-cols-6 gap-3" id="seatGrid">
                     <!-- JSで生成されます -->
                 </div>
             </div>
 
             <!-- 印刷用フッター -->
-            <div class="hidden print-only mt-8 w-full text-center">
-                <div class="border-t border-gray-300 pt-4 flex justify-between px-20">
-                    <div>日付: ____月____日</div>
-                    <div>担任印: ________</div>
+            <div class="hidden print-only mt-12 w-full text-center">
+                <div class="border-t border-slate-300 pt-4 flex justify-between px-24 text-slate-600 text-sm">
+                    <div>日付: <span class="inline-block w-12 border-b border-slate-400"></span>月 <span class="inline-block w-12 border-b border-slate-400"></span>日</div>
+                    <div>担任: <span class="inline-block w-24 border-b border-slate-400"></span></div>
                 </div>
             </div>
 
@@ -187,13 +199,15 @@
     </main>
 
     <!-- モーダル（名前入力用） -->
-    <div id="nameModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-80 shadow-2xl transform transition-all">
-            <h3 class="text-lg font-bold mb-4 text-gray-800">座席情報の編集</h3>
-            <input type="text" id="modalInputName" class="w-full border border-gray-300 rounded p-2 mb-4 text-lg" placeholder="名前を入力">
+    <div id="nameModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 transition-opacity">
+        <div class="bg-white rounded-xl p-6 w-80 shadow-2xl transform transition-all border border-slate-100">
+            <h3 class="text-lg font-bold mb-4 text-slate-800 flex items-center gap-2">
+                <i class="fas fa-user-edit text-slate-400"></i> 座席編集
+            </h3>
+            <input type="text" id="modalInputName" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-3 mb-6 text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition" placeholder="名前を入力">
             <div class="flex justify-end gap-2">
-                <button onclick="closeModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">キャンセル</button>
-                <button onclick="saveModal()" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">確定</button>
+                <button onclick="closeModal()" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-medium transition">キャンセル</button>
+                <button onclick="saveModal()" class="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 text-sm font-bold shadow-lg shadow-slate-300/50 transition">確定</button>
             </div>
         </div>
     </div>
@@ -207,9 +221,6 @@
         let currentEditSeatIndex = -1;
 
         // 座席データ管理
-        // type: 'any' | 'boy' | 'girl' | 'unused'
-        // name: string
-        // locked: boolean
         let seatsData = [];
 
         // DOM要素
@@ -223,7 +234,6 @@
 
         // 初期化
         function init() {
-            // データ初期化
             for (let i = 0; i < TOTAL_SEATS; i++) {
                 seatsData.push({
                     id: i,
@@ -253,51 +263,52 @@
             seatsData.forEach((seat, index) => {
                 const seatEl = document.createElement('div');
                 
-                // クラス設定
-                let colorClass = 'bg-gray-50 border-gray-200';
+                // クラス設定 - クールなデザインに変更
+                let colorClass = 'bg-slate-50 border-slate-200 text-slate-400';
                 let icon = '';
                 
                 if (seat.type === 'boy') {
-                    colorClass = 'bg-blue-50 border-blue-200';
-                    icon = '<i class="fas fa-mars text-blue-200 absolute bottom-1 right-2 text-3xl opacity-20 pointer-events-none"></i>';
+                    colorClass = 'bg-blue-50/50 border-blue-200 text-blue-600';
+                    icon = '<i class="fas fa-mars text-blue-100 absolute bottom-1 right-2 text-3xl opacity-50 pointer-events-none"></i>';
                 } else if (seat.type === 'girl') {
-                    colorClass = 'bg-pink-50 border-pink-200';
-                    icon = '<i class="fas fa-venus text-pink-200 absolute bottom-1 right-2 text-3xl opacity-20 pointer-events-none"></i>';
+                    colorClass = 'bg-pink-50/50 border-pink-200 text-pink-600';
+                    icon = '<i class="fas fa-venus text-pink-100 absolute bottom-1 right-2 text-3xl opacity-50 pointer-events-none"></i>';
                 } else if (seat.type === 'unused') {
-                    colorClass = 'bg-gray-800 border-gray-900';
+                    colorClass = 'bg-slate-100 border-slate-200 opacity-40'; // より控えめに
                 }
 
                 if (seat.locked) {
-                    colorClass += ' ring-2 ring-yellow-400 ring-offset-1';
+                    // ロック時はアクセントを強める
+                    colorClass += ' ring-2 ring-yellow-400/70 ring-offset-2 ring-offset-white';
                 }
 
-                seatEl.className = `seat relative w-20 h-20 md:w-24 md:h-24 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer ${colorClass}`;
-                if (seat.type === 'unused') seatEl.classList.add('opacity-80');
-
+                seatEl.className = `seat relative w-20 h-20 md:w-24 md:h-24 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer shadow-sm ${colorClass}`;
+                
                 seatEl.setAttribute('draggable', seat.type !== 'unused');
                 seatEl.dataset.index = index;
 
                 // コンテンツ生成
                 if (seat.type !== 'unused') {
-                    const nameDisplay = seat.name ? `<span class="text-lg font-bold text-gray-800 z-10 break-all leading-tight text-center px-1">${seat.name}</span>` : `<span class="text-gray-300 font-bold text-xl z-10">${index + 1}</span>`;
+                    // 名前がある場合は濃い色、なければ薄い番号
+                    const textColor = seat.name ? 'text-slate-800' : 'text-slate-300';
+                    const nameDisplay = seat.name 
+                        ? `<span class="text-lg font-bold ${textColor} z-10 break-all leading-tight text-center px-1 drop-shadow-sm">${seat.name}</span>` 
+                        : `<span class="${textColor} font-bold text-xl z-10 font-mono opacity-50">${index + 1}</span>`;
                     
                     const lockIcon = seat.locked 
-                        ? `<button onclick="toggleLock(event, ${index})" class="absolute top-1 right-1 text-yellow-500 hover:text-yellow-600 transition z-20"><i class="fas fa-lock"></i></button>`
-                        : `<button onclick="toggleLock(event, ${index})" class="absolute top-1 right-1 text-gray-300 hover:text-gray-400 transition z-20"><i class="fas fa-lock-open"></i></button>`;
+                        ? `<button onclick="toggleLock(event, ${index})" class="absolute top-1 right-1 text-yellow-500 hover:text-yellow-600 transition z-20 drop-shadow-sm"><i class="fas fa-lock"></i></button>`
+                        : `<button onclick="toggleLock(event, ${index})" class="absolute top-1 right-1 text-slate-300 hover:text-slate-400 transition z-20"><i class="fas fa-lock-open text-xs"></i></button>`;
 
-                    // 先生用視点時の文字反転用ラッパー
-                    const contentWrapper = `<div class="seat-content w-full h-full flex items-center justify-center relative">${nameDisplay}${lockIcon}${icon}</div>`;
+                    const contentWrapper = `<div class="seat-content w-full h-full flex items-center justify-center relative overflow-hidden rounded-lg">${nameDisplay}${lockIcon}${icon}</div>`;
                     
                     seatEl.innerHTML = contentWrapper;
                 } else {
-                    seatEl.innerHTML = '<i class="fas fa-times text-gray-600 text-xl"></i>';
+                    seatEl.innerHTML = '<i class="fas fa-times text-slate-300 text-lg"></i>';
                 }
 
-                // イベントリスナー
                 seatEl.addEventListener('click', (e) => handleSeatClick(e, index));
                 seatEl.addEventListener('dblclick', (e) => openModal(index));
                 
-                // ドラッグ＆ドロップ
                 if (seat.type !== 'unused') {
                     seatEl.addEventListener('dragstart', handleDragStart);
                     seatEl.addEventListener('dragenter', handleDragEnter);
@@ -311,45 +322,52 @@
             });
         }
 
-        // 座席クリック（属性変更）
         function handleSeatClick(e, index) {
-            // ロックボタンなどを押したときは発火させない
             if (e.target.closest('button')) return;
 
             const seat = seatsData[index];
-            if (seat.locked) return; // ロック中は変更不可
+            if (seat.locked) return;
 
             const types = ['any', 'boy', 'girl', 'unused'];
             const currentIdx = types.indexOf(seat.type);
             seat.type = types[(currentIdx + 1) % types.length];
             
-            // 未使用席になったら名前を消す
             if (seat.type === 'unused') {
                 seat.name = '';
             }
             renderGrid();
         }
 
-        // ロック切り替え
         function toggleLock(e, index) {
             e.stopPropagation();
             seatsData[index].locked = !seatsData[index].locked;
             renderGrid();
         }
 
-        // モーダル操作
         function openModal(index) {
             if (seatsData[index].type === 'unused') return;
             currentEditSeatIndex = index;
             document.getElementById('modalInputName').value = seatsData[index].name;
-            document.getElementById('nameModal').classList.remove('hidden');
-            document.getElementById('nameModal').classList.add('flex');
+            const modal = document.getElementById('nameModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            // アニメーション用クラス操作
+            setTimeout(() => {
+                modal.firstElementChild.classList.remove('scale-95', 'opacity-0');
+                modal.firstElementChild.classList.add('scale-100', 'opacity-100');
+            }, 10);
             document.getElementById('modalInputName').focus();
         }
 
         function closeModal() {
-            document.getElementById('nameModal').classList.add('hidden');
-            document.getElementById('nameModal').classList.remove('flex');
+            const modal = document.getElementById('nameModal');
+            // アニメーション
+            modal.firstElementChild.classList.remove('scale-100', 'opacity-100');
+            modal.firstElementChild.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 200);
             currentEditSeatIndex = -1;
         }
 
@@ -358,7 +376,6 @@
             const newName = document.getElementById('modalInputName').value.trim();
             seatsData[currentEditSeatIndex].name = newName;
             
-            // 名前が入ったら自動ロック（親切設計）
             if (newName !== "") {
                 seatsData[currentEditSeatIndex].locked = true;
             }
@@ -369,11 +386,9 @@
 
         // --- 席決めアルゴリズム ---
         function shuffleSeats() {
-            // 1. 名簿取得
             let boys = boyInput.value.split(/\n/).map(s => s.trim()).filter(s => s !== "");
             let girls = girlInput.value.split(/\n/).map(s => s.trim()).filter(s => s !== "");
 
-            // シャッフル関数
             const shuffle = (arr) => {
                 for (let i = arr.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
@@ -385,13 +400,10 @@
             boys = shuffle(boys);
             girls = shuffle(girls);
 
-            // 2. 配置ロジック
-            // ロックされていない席の既存の名前をクリア
             seatsData.forEach(s => {
                 if (!s.locked && s.type !== 'unused') s.name = '';
             });
 
-            // ターゲット座席の分類
             let boySeats = [];
             let girlSeats = [];
             let anySeats = [];
@@ -403,18 +415,14 @@
                 else anySeats.push(s);
             });
 
-            // 専用席を埋める
             boySeats.forEach(s => { if (boys.length) s.name = boys.pop(); });
             girlSeats.forEach(s => { if (girls.length) s.name = girls.pop(); });
 
-            // 余りを統合してシャッフル
             let remainingPeople = [...boys, ...girls];
             remainingPeople = shuffle(remainingPeople);
 
-            // フリー席を埋める
             anySeats.forEach(s => { if (remainingPeople.length) s.name = remainingPeople.pop(); });
 
-            // それでも余ったら空いている専用席に詰める（緊急回避）
             if (remainingPeople.length > 0) {
                 const emptyRest = seatsData.filter(s => !s.locked && s.type !== 'unused' && s.name === '');
                 emptyRest.forEach(s => { if (remainingPeople.length) s.name = remainingPeople.pop(); });
@@ -435,10 +443,9 @@
             renderGrid();
         }
 
-        // プリセット
         function applyPreset(mode) {
             seatsData.forEach((s, i) => {
-                if (s.locked) return; // ロック中は変更しない
+                if (s.locked) return;
 
                 const row = Math.floor(i / COLS);
                 const col = i % COLS;
@@ -450,24 +457,22 @@
                 } else if (mode === 'rows') {
                     s.type = (col % 2 === 0) ? 'boy' : 'girl';
                 } else if (mode === 'boys-front') {
-                    // 前半（0-3行目）男子、後半女子
                     s.type = (row < ROWS / 2) ? 'boy' : 'girl';
                 }
             });
             renderGrid();
         }
 
-        // 視点切り替え
         function toggleView() {
             isTeacherView = !isTeacherView;
             if (isTeacherView) {
                 containerEl.classList.add('rotate-180-centered');
-                viewLabelEl.innerHTML = '<i class="fas fa-chalkboard-teacher mr-1"></i> 教卓用（先生側から）';
-                viewLabelEl.className = "text-sm font-bold px-3 py-1 bg-yellow-100 rounded-full text-yellow-800";
+                viewLabelEl.innerHTML = '<i class="fas fa-chalkboard-teacher mr-1"></i> 教卓視点';
+                viewLabelEl.className = "text-xs font-bold px-4 py-1.5 bg-amber-100 rounded-full text-amber-800 uppercase tracking-wide";
             } else {
                 containerEl.classList.remove('rotate-180-centered');
-                viewLabelEl.innerHTML = '<i class="fas fa-users mr-1"></i> 生徒側から（掲示用）';
-                viewLabelEl.className = "text-sm font-bold px-3 py-1 bg-gray-100 rounded-full text-gray-600";
+                viewLabelEl.innerHTML = '<i class="fas fa-users mr-1"></i> 生徒視点';
+                viewLabelEl.className = "text-xs font-bold px-4 py-1.5 bg-slate-100 rounded-full text-slate-600 uppercase tracking-wide";
             }
         }
 
@@ -503,11 +508,9 @@
             const targetIndex = parseInt(this.dataset.index);
             
             if (dragSrcIndex !== targetIndex && seatsData[targetIndex].type !== 'unused') {
-                // データを交換
                 const srcData = seatsData[dragSrcIndex];
                 const targetData = seatsData[targetIndex];
 
-                // 名前とロック状態を交換する
                 const tempName = srcData.name;
                 const tempLocked = srcData.locked;
 
