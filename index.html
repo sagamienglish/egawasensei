@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR座席表メーカー (6x8)</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* 印刷設定 */
+        @media print {
+            body { background-color: white; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            .seat-container { 
+                border: 2px solid #000;
+                box-shadow: none;
+                transform: scale(0.9); /* A4に収まるように少し縮小 */
+                margin: 0 auto;
+            }
+            .seat {
+                border: 1px solid #000 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            /* 印刷時は色を薄くするか、そのままにするか。今回は視認性重視でそのまま */
+            .main-layout { display: block; }
+            .control-panel { display: none; }
+            .grid-area { width: 100%; justify-content: center; }
+        }
+
+        /* 座席の個別スタイル */
+        .seat {
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .seat:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            z-index: 10;
+        }
+        .seat.dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+        .seat.drag-over {
+            border: 2px dashed #4B5563;
+            transform: scale(1.05);
+        }
+
+        /* 視点回転アニメーション */
+        .rotate-180-centered {
+            transform: rotate(180deg);
+        }
+        /* 回転時、文字は逆さまにならないように座席自体をもう一度回す */
+        .rotate-180-centered .seat-content {
+            transform: rotate(180deg);
+        }
+
+        /* カスタムスクロールバー */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-sm z-10 no-print">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-school text-indigo-600 text-xl"></i>
+                <h1 class="text-xl font-bold text-gray-800">HR 座席表メーカー <span class="text-sm font-normal text-gray-500 ml-2">6列 × 8段</span></h1>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="window.print()" class="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md text-sm font-medium transition flex items-center gap-2">
+                    <i class="fas fa-print"></i> 印刷する
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 flex overflow-hidden main-layout">
+        
+        <!-- 左サイドバー（設定・入力） -->
+        <aside class="w-80 bg-white border-r border-gray-200 flex flex-col overflow-y-auto no-print control-panel z-20 shadow-lg">
+            <div class="p-4 space-y-6">
+                
+                <!-- 名簿入力エリア -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold text-blue-600 mb-1"><i class="fas fa-mars"></i> 男子名簿 (改行区切り)</label>
+                        <textarea id="boyNames" class="w-full h-32 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none" placeholder="相川&#13;井上&#13;上野..."></textarea>
+                        <div class="text-xs text-gray-500 text-right mt-1">人数: <span id="boyCount">0</span>人</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-pink-600 mb-1"><i class="fas fa-venus"></i> 女子名簿 (改行区切り)</label>
+                        <textarea id="girlNames" class="w-full h-32 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm resize-none" placeholder="安藤&#13;伊藤&#13;宇野..."></textarea>
+                        <div class="text-xs text-gray-500 text-right mt-1">人数: <span id="girlCount">0</span>人</div>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-200 pt-4">
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">座席パターン設定</label>
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <button onclick="applyPreset('checker')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium text-gray-700 transition">
+                            <i class="fas fa-chess-board mr-1"></i> 市松模様
+                        </button>
+                        <button onclick="applyPreset('rows')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium text-gray-700 transition">
+                            <i class="fas fa-grip-lines-vertical mr-1"></i> 男女列別
+                        </button>
+                        <button onclick="applyPreset('boys-front')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium text-gray-700 transition">
+                            <i class="fas fa-arrow-up mr-1"></i> 男子前
+                        </button>
+                        <button onclick="applyPreset('reset')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium text-red-600 transition">
+                            <i class="fas fa-eraser mr-1"></i> 全クリア
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-400">※座席クリックで属性変更（フリー→男→女→不可）</p>
+                </div>
+
+                <div class="border-t border-gray-200 pt-4 space-y-3">
+                    <button onclick="shuffleSeats()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition transform hover:scale-[1.02] active:scale-95 flex justify-center items-center gap-2">
+                        <i class="fas fa-random"></i> 席決めスタート
+                    </button>
+                    <button onclick="clearNamesOnly()" class="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-md transition text-sm">
+                        名前のみクリア
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 右エリア（座席グリッド） -->
+        <div class="flex-1 bg-gray-100 overflow-auto p-4 md:p-8 flex flex-col items-center grid-area relative">
+            
+            <!-- ビュー切り替えコントロール -->
+            <div class="mb-6 flex items-center gap-4 bg-white p-2 rounded-full shadow-sm border border-gray-200 no-print z-10">
+                <span id="viewLabel" class="text-sm font-bold px-3 py-1 bg-gray-100 rounded-full text-gray-600">
+                    <i class="fas fa-users mr-1"></i> 生徒側から（掲示用）
+                </span>
+                <button onclick="toggleView()" class="text-indigo-600 hover:text-indigo-800 transition p-2 rounded-full hover:bg-indigo-50" title="視点を180度回転">
+                    <i class="fas fa-sync-alt fa-lg"></i>
+                </button>
+            </div>
+
+            <!-- 黒板エリア -->
+            <div id="blackboard" class="w-3/4 max-w-3xl h-12 bg-green-800 rounded-lg shadow-md flex items-center justify-center mb-8 text-white font-bold tracking-[1em] border-4 border-yellow-700/50">
+                黒板
+            </div>
+
+            <!-- 座席コンテナ -->
+            <div id="seatContainer" class="seat-container bg-white p-6 rounded-xl shadow-xl transition-transform duration-500 ease-in-out">
+                <div class="grid grid-cols-6 gap-3" id="seatGrid">
+                    <!-- JSで生成されます -->
+                </div>
+            </div>
+
+            <!-- 印刷用フッター -->
+            <div class="hidden print-only mt-8 w-full text-center">
+                <div class="border-t border-gray-300 pt-4 flex justify-between px-20">
+                    <div>日付: ____月____日</div>
+                    <div>担任印: ________</div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- モーダル（名前入力用） -->
+    <div id="nameModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-80 shadow-2xl transform transition-all">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">座席情報の編集</h3>
+            <input type="text" id="modalInputName" class="w-full border border-gray-300 rounded p-2 mb-4 text-lg" placeholder="名前を入力">
+            <div class="flex justify-end gap-2">
+                <button onclick="closeModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">キャンセル</button>
+                <button onclick="saveModal()" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 設定定数
+        const COLS = 6;
+        const ROWS = 8;
+        const TOTAL_SEATS = COLS * ROWS;
+        let isTeacherView = false;
+        let currentEditSeatIndex = -1;
+
+        // 座席データ管理
+        // type: 'any' | 'boy' | 'girl' | 'unused'
+        // name: string
+        // locked: boolean
+        let seatsData = [];
+
+        // DOM要素
+        const gridEl = document.getElementById('seatGrid');
+        const containerEl = document.getElementById('seatContainer');
+        const viewLabelEl = document.getElementById('viewLabel');
+        const boyInput = document.getElementById('boyNames');
+        const girlInput = document.getElementById('girlNames');
+        const boyCountEl = document.getElementById('boyCount');
+        const girlCountEl = document.getElementById('girlCount');
+
+        // 初期化
+        function init() {
+            // データ初期化
+            for (let i = 0; i < TOTAL_SEATS; i++) {
+                seatsData.push({
+                    id: i,
+                    type: 'any',
+                    name: '',
+                    locked: false
+                });
+            }
+            renderGrid();
+            updateCounts();
+        }
+
+        // 人数カウント更新
+        function updateCounts() {
+            const b = boyInput.value.trim().split(/\n/).filter(line => line.trim() !== '').length;
+            const g = girlInput.value.trim().split(/\n/).filter(line => line.trim() !== '').length;
+            boyCountEl.textContent = b;
+            girlCountEl.textContent = g;
+        }
+        boyInput.addEventListener('input', updateCounts);
+        girlInput.addEventListener('input', updateCounts);
+
+        // グリッド描画
+        function renderGrid() {
+            gridEl.innerHTML = '';
+
+            seatsData.forEach((seat, index) => {
+                const seatEl = document.createElement('div');
+                
+                // クラス設定
+                let colorClass = 'bg-gray-50 border-gray-200';
+                let icon = '';
+                
+                if (seat.type === 'boy') {
+                    colorClass = 'bg-blue-50 border-blue-200';
+                    icon = '<i class="fas fa-mars text-blue-200 absolute bottom-1 right-2 text-3xl opacity-20 pointer-events-none"></i>';
+                } else if (seat.type === 'girl') {
+                    colorClass = 'bg-pink-50 border-pink-200';
+                    icon = '<i class="fas fa-venus text-pink-200 absolute bottom-1 right-2 text-3xl opacity-20 pointer-events-none"></i>';
+                } else if (seat.type === 'unused') {
+                    colorClass = 'bg-gray-800 border-gray-900';
+                }
+
+                if (seat.locked) {
+                    colorClass += ' ring-2 ring-yellow-400 ring-offset-1';
+                }
+
+                seatEl.className = `seat relative w-20 h-20 md:w-24 md:h-24 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer ${colorClass}`;
+                if (seat.type === 'unused') seatEl.classList.add('opacity-80');
+
+                seatEl.setAttribute('draggable', seat.type !== 'unused');
+                seatEl.dataset.index = index;
+
+                // コンテンツ生成
+                if (seat.type !== 'unused') {
+                    const nameDisplay = seat.name ? `<span class="text-lg font-bold text-gray-800 z-10 break-all leading-tight text-center px-1">${seat.name}</span>` : `<span class="text-gray-300 font-bold text-xl z-10">${index + 1}</span>`;
+                    
+                    const lockIcon = seat.locked 
+                        ? `<button onclick="toggleLock(event, ${index})" class="absolute top-1 right-1 text-yellow-500 hover:text-yellow-600 transition z-20"><i class="fas fa-lock"></i></button>`
+                        : `<button onclick="toggleLock(event, ${index})" class="absolute top-1 right-1 text-gray-300 hover:text-gray-400 transition z-20"><i class="fas fa-lock-open"></i></button>`;
+
+                    // 先生用視点時の文字反転用ラッパー
+                    const contentWrapper = `<div class="seat-content w-full h-full flex items-center justify-center relative">${nameDisplay}${lockIcon}${icon}</div>`;
+                    
+                    seatEl.innerHTML = contentWrapper;
+                } else {
+                    seatEl.innerHTML = '<i class="fas fa-times text-gray-600 text-xl"></i>';
+                }
+
+                // イベントリスナー
+                seatEl.addEventListener('click', (e) => handleSeatClick(e, index));
+                seatEl.addEventListener('dblclick', (e) => openModal(index));
+                
+                // ドラッグ＆ドロップ
+                if (seat.type !== 'unused') {
+                    seatEl.addEventListener('dragstart', handleDragStart);
+                    seatEl.addEventListener('dragenter', handleDragEnter);
+                    seatEl.addEventListener('dragover', handleDragOver);
+                    seatEl.addEventListener('dragleave', handleDragLeave);
+                    seatEl.addEventListener('drop', handleDrop);
+                    seatEl.addEventListener('dragend', handleDragEnd);
+                }
+
+                gridEl.appendChild(seatEl);
+            });
+        }
+
+        // 座席クリック（属性変更）
+        function handleSeatClick(e, index) {
+            // ロックボタンなどを押したときは発火させない
+            if (e.target.closest('button')) return;
+
+            const seat = seatsData[index];
+            if (seat.locked) return; // ロック中は変更不可
+
+            const types = ['any', 'boy', 'girl', 'unused'];
+            const currentIdx = types.indexOf(seat.type);
+            seat.type = types[(currentIdx + 1) % types.length];
+            
+            // 未使用席になったら名前を消す
+            if (seat.type === 'unused') {
+                seat.name = '';
+            }
+            renderGrid();
+        }
+
+        // ロック切り替え
+        function toggleLock(e, index) {
+            e.stopPropagation();
+            seatsData[index].locked = !seatsData[index].locked;
+            renderGrid();
+        }
+
+        // モーダル操作
+        function openModal(index) {
+            if (seatsData[index].type === 'unused') return;
+            currentEditSeatIndex = index;
+            document.getElementById('modalInputName').value = seatsData[index].name;
+            document.getElementById('nameModal').classList.remove('hidden');
+            document.getElementById('nameModal').classList.add('flex');
+            document.getElementById('modalInputName').focus();
+        }
+
+        function closeModal() {
+            document.getElementById('nameModal').classList.add('hidden');
+            document.getElementById('nameModal').classList.remove('flex');
+            currentEditSeatIndex = -1;
+        }
+
+        function saveModal() {
+            if (currentEditSeatIndex === -1) return;
+            const newName = document.getElementById('modalInputName').value.trim();
+            seatsData[currentEditSeatIndex].name = newName;
+            
+            // 名前が入ったら自動ロック（親切設計）
+            if (newName !== "") {
+                seatsData[currentEditSeatIndex].locked = true;
+            }
+
+            renderGrid();
+            closeModal();
+        }
+
+        // --- 席決めアルゴリズム ---
+        function shuffleSeats() {
+            // 1. 名簿取得
+            let boys = boyInput.value.split(/\n/).map(s => s.trim()).filter(s => s !== "");
+            let girls = girlInput.value.split(/\n/).map(s => s.trim()).filter(s => s !== "");
+
+            // シャッフル関数
+            const shuffle = (arr) => {
+                for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                }
+                return arr;
+            };
+
+            boys = shuffle(boys);
+            girls = shuffle(girls);
+
+            // 2. 配置ロジック
+            // ロックされていない席の既存の名前をクリア
+            seatsData.forEach(s => {
+                if (!s.locked && s.type !== 'unused') s.name = '';
+            });
+
+            // ターゲット座席の分類
+            let boySeats = [];
+            let girlSeats = [];
+            let anySeats = [];
+
+            seatsData.forEach(s => {
+                if (s.locked || s.type === 'unused') return;
+                if (s.type === 'boy') boySeats.push(s);
+                else if (s.type === 'girl') girlSeats.push(s);
+                else anySeats.push(s);
+            });
+
+            // 専用席を埋める
+            boySeats.forEach(s => { if (boys.length) s.name = boys.pop(); });
+            girlSeats.forEach(s => { if (girls.length) s.name = girls.pop(); });
+
+            // 余りを統合してシャッフル
+            let remainingPeople = [...boys, ...girls];
+            remainingPeople = shuffle(remainingPeople);
+
+            // フリー席を埋める
+            anySeats.forEach(s => { if (remainingPeople.length) s.name = remainingPeople.pop(); });
+
+            // それでも余ったら空いている専用席に詰める（緊急回避）
+            if (remainingPeople.length > 0) {
+                const emptyRest = seatsData.filter(s => !s.locked && s.type !== 'unused' && s.name === '');
+                emptyRest.forEach(s => { if (remainingPeople.length) s.name = remainingPeople.pop(); });
+            }
+
+            renderGrid();
+
+            if (remainingPeople.length > 0) {
+                alert(`席が足りず、以下の生徒を配置できませんでした：\n${remainingPeople.join(', ')}`);
+            }
+        }
+
+        function clearNamesOnly() {
+            if(!confirm('ロックされていない席の名前を全て消去しますか？')) return;
+            seatsData.forEach(s => {
+                if (!s.locked) s.name = '';
+            });
+            renderGrid();
+        }
+
+        // プリセット
+        function applyPreset(mode) {
+            seatsData.forEach((s, i) => {
+                if (s.locked) return; // ロック中は変更しない
+
+                const row = Math.floor(i / COLS);
+                const col = i % COLS;
+
+                if (mode === 'reset') {
+                    s.type = 'any';
+                } else if (mode === 'checker') {
+                    s.type = ((row + col) % 2 === 0) ? 'boy' : 'girl';
+                } else if (mode === 'rows') {
+                    s.type = (col % 2 === 0) ? 'boy' : 'girl';
+                } else if (mode === 'boys-front') {
+                    // 前半（0-3行目）男子、後半女子
+                    s.type = (row < ROWS / 2) ? 'boy' : 'girl';
+                }
+            });
+            renderGrid();
+        }
+
+        // 視点切り替え
+        function toggleView() {
+            isTeacherView = !isTeacherView;
+            if (isTeacherView) {
+                containerEl.classList.add('rotate-180-centered');
+                viewLabelEl.innerHTML = '<i class="fas fa-chalkboard-teacher mr-1"></i> 教卓用（先生側から）';
+                viewLabelEl.className = "text-sm font-bold px-3 py-1 bg-yellow-100 rounded-full text-yellow-800";
+            } else {
+                containerEl.classList.remove('rotate-180-centered');
+                viewLabelEl.innerHTML = '<i class="fas fa-users mr-1"></i> 生徒側から（掲示用）';
+                viewLabelEl.className = "text-sm font-bold px-3 py-1 bg-gray-100 rounded-full text-gray-600";
+            }
+        }
+
+        // --- DnD ロジック ---
+        let dragSrcIndex = -1;
+
+        function handleDragStart(e) {
+            this.classList.add('dragging');
+            dragSrcIndex = parseInt(this.dataset.index);
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDragEnter(e) {
+            if (this.dataset.index != dragSrcIndex) {
+                this.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) e.stopPropagation();
+            
+            const targetIndex = parseInt(this.dataset.index);
+            
+            if (dragSrcIndex !== targetIndex && seatsData[targetIndex].type !== 'unused') {
+                // データを交換
+                const srcData = seatsData[dragSrcIndex];
+                const targetData = seatsData[targetIndex];
+
+                // 名前とロック状態を交換する
+                const tempName = srcData.name;
+                const tempLocked = srcData.locked;
+
+                srcData.name = targetData.name;
+                srcData.locked = targetData.locked;
+
+                targetData.name = tempName;
+                targetData.locked = tempLocked;
+
+                renderGrid();
+            }
+            return false;
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.seat').forEach(el => el.classList.remove('drag-over'));
+        }
+
+        // 開始
+        init();
+
+    </script>
+</body>
+</html>
